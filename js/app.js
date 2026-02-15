@@ -11,16 +11,11 @@
  *     OLD:  Slider (B-O-B angle) → Hamiltonian → Band Gap → Canvas
  *     NEW:  Slider (System pH)   → Henderson-Hasselbalch → Protonation → Canvas
  *
- * STUBBED VISUALISERS (Phase 2 — NOT YET IMPLEMENTED):
+ * WIRED VISUALISERS:
  * ────────────────────────────────────────────────────────────────────
- *   - js/molecules.js  → MoleculeRenderer class (2D structure with Canvas)
- *   - js/pathways.js   → PathwayPlotter class   (metabolic flux diagram)
- *
- *   Until these exist, all visual output is routed to:
- *     1. Console logging   (via updateVisualsStub)
- *     2. DOM text updates  (stat values in the HTML panels)
- *
- *   This ensures the app loads and runs WITHOUT crashing.
+ *   - js/chemistry.js  → MetabolicModel (Henderson-Hasselbalch solver)
+ *   - js/molecules.js  → MoleculeRenderer (2D structure with Canvas)
+ *   - js/pathways.js   → PathwayPlotter (Bjerrum speciation diagram)
  *
  * SCORCHED EARTH CONFIRMATION:
  * ────────────────────────────────────────────────────────────────────
@@ -44,23 +39,41 @@ class SimulationEngine {
         };
 
         // ─── Chemistry Model ────────────────────────────────────────
-        // MetabolicModel is loaded from js/chemistry.js (must be included
-        // in index.html BEFORE this script). If unavailable, we degrade
-        // gracefully and log a warning.
         if (typeof MetabolicModel !== 'undefined') {
             this.model = new MetabolicModel();
             console.log('✅ MetabolicModel loaded from chemistry.js');
         } else {
             this.model = null;
-            console.warn('⚠️  MetabolicModel not found. Running in STUB mode.');
-            console.warn('    → Ensure js/chemistry.js is loaded before js/app.js');
+            console.warn('⚠️  MetabolicModel not found. Using inline Henderson-Hasselbalch.');
         }
 
-        // ─── Visualisers: STUBBED (Phase 2) ─────────────────────────
-        // DO NOT instantiate MoleculeRenderer or PathwayPlotter here.
-        // They do not exist yet. All rendering is routed through
-        // updateVisualsStub() until Phase 2 deliverables are complete.
+        // ─── Visualisers: Connect Canvas & Plotly Renderers ──────────
         this.visualsReady = false;
+
+        try {
+            // Panel A: Protonated species (re-uses cubic canvas)
+            if (typeof MoleculeRenderer !== 'undefined') {
+                this.rendererProtonated = new MoleculeRenderer('canvasCubic');
+                console.log('✅ MoleculeRenderer (Protonated) initialized');
+            }
+
+            // Panel B: Deprotonated species (re-uses distorted canvas)
+            if (typeof MoleculeRenderer !== 'undefined') {
+                this.rendererDeprotonated = new MoleculeRenderer('canvasDistorted');
+                console.log('✅ MoleculeRenderer (Deprotonated) initialized');
+            }
+
+            // Panel C: Speciation diagram (re-uses plotBandStructure div)
+            if (typeof PathwayPlotter !== 'undefined') {
+                this.plotter = new PathwayPlotter('plotBandStructure');
+                console.log('✅ PathwayPlotter initialized');
+            }
+
+            this.visualsReady = true;
+        } catch (err) {
+            console.error('❌ Error initializing visualizers:', err);
+            this.visualsReady = false;
+        }
 
         // ─── Initialise UI Bindings ─────────────────────────────────
         this.initializeUI();
@@ -74,19 +87,6 @@ class SimulationEngine {
 
     /**
      * Bind DOM elements to state via Observer Pattern.
-     * 
-     * NOTE ON SLIDER RE-MAPPING:
-     * ──────────────────────────
-     * The legacy index.html slider has min="140" max="180" (angle degrees).
-     * Until index.html is updated to min="0" max="14" step="0.1",
-     * we RE-MAP the slider value in the event handler:
-     *
-     *     raw slider (140–180) → pH (0.0–14.0)
-     *     pH = (raw - 140) / (180 - 140) * 14.0
-     *
-     * TODO: Update index.html slider attributes to:
-     *   <input type="range" id="pHSlider" min="0" max="14" value="7.4" step="0.1">
-     * Once that is done, remove the re-mapping logic below.
      */
     initializeUI() {
         // ─── pH Slider (re-mapped from legacy angle slider) ─────────
@@ -99,7 +99,6 @@ class SimulationEngine {
                 const raw = parseFloat(e.target.value);
                 this.state.pH = ((raw - 140) / (180 - 140)) * 14.0;
 
-                // Update display with pH (override legacy "angle" text)
                 if (valueDisplay) {
                     valueDisplay.textContent = this.state.pH.toFixed(1);
                 }
@@ -107,19 +106,17 @@ class SimulationEngine {
                 this.update();
             });
 
-            // Set initial display to pH
             if (valueDisplay) {
                 valueDisplay.textContent = this.state.pH.toFixed(1);
             }
         }
 
-        // ─── Metabolite Selector (re-mapped from legacy metal select) ─
+        // ─── Metabolite Selector ─────────────────────────────────────
         const metaboliteSelect = document.getElementById('metalSelect');
         if (metaboliteSelect) {
             metaboliteSelect.addEventListener('change', (e) => {
                 this.state.metabolite = e.target.value;
 
-                // Re-initialise model if it supports metabolite switching
                 if (this.model && typeof this.model.setMetabolite === 'function') {
                     this.model.setMetabolite(this.state.metabolite);
                 }
@@ -128,7 +125,7 @@ class SimulationEngine {
             });
         }
 
-        // ─── Toggle: Show Molecular Structure ───────────────────────
+        // ─── Toggles ─────────────────────────────────────────────────
         const structureToggle = document.getElementById('showOrbitalLobes');
         if (structureToggle) {
             structureToggle.addEventListener('change', (e) => {
@@ -137,7 +134,6 @@ class SimulationEngine {
             });
         }
 
-        // ─── Toggle: Show Metabolic Pathway ─────────────────────────
         const pathwayToggle = document.getElementById('showBonds');
         if (pathwayToggle) {
             pathwayToggle.addEventListener('change', (e) => {
@@ -148,99 +144,105 @@ class SimulationEngine {
     }
 
     /**
-     * Core computation pipeline.
-     * Called on every state change (slider drag, metabolite switch).
-     *
-     * Flow:  State → Model.solve(pH) → Results → Render
+     * Core computation pipeline: State → Model.solve(pH) → Results → Render
      */
     update() {
         const { pH, metabolite } = this.state;
 
         if (this.model && typeof this.model.solve === 'function') {
-            // ─── Production path: chemistry.js is loaded ────────────
             this.results = this.model.solve(pH);
         } else {
-            // ─── Stub path: compute Henderson-Hasselbalch inline ────
-            // Pyruvate pKa = 2.50 (standard biochemistry reference)
+            // Fallback: inline Henderson-Hasselbalch
             const pKa = 2.50;
             const ratio = Math.pow(10, pH - pKa);
-            const deprotonatedFraction = ratio / (1 + ratio);
-            const protonatedFraction = 1 - deprotonatedFraction;
+            const deprotonated = ratio / (1 + ratio);
+            const protonated = 1 - deprotonated;
 
             this.results = {
-                metabolite: metabolite,
-                pKa: pKa,
-                pH: pH,
-                protonatedPercent: protonatedFraction * 100,
-                deprotonatedPercent: deprotonatedFraction * 100,
-                netCharge: -1 * deprotonatedFraction,
-                dominantSpecies: deprotonatedFraction > 0.5 ? 'Pyruvate⁻' : 'Pyruvic Acid'
+                identity: { name: metabolite, pKa: pKa },
+                physics: {
+                    pH: pH,
+                    pKa: pKa,
+                    protonated: protonated,
+                    deprotonated: deprotonated,
+                    protonatedPercent: protonated * 100,
+                    deprotonatedPercent: deprotonated * 100,
+                    netCharge: -1 * deprotonated,
+                    dominantSpecies: deprotonated > 0.5 ? `${metabolite}⁻` : `${metabolite} Acid`
+                }
             };
         }
 
-        // Trigger render pipeline
         this.render();
     }
 
     /**
-     * Render all visualisations.
-     * Routes to stub method until Phase 2 visualisers are built.
+     * Render all visualisations and stats.
      */
     render() {
-        // ─── Phase 2 visualisers (stubbed) ──────────────────────────
-        this.updateVisualsStub();
-
-        // ─── DOM stat updates (always active) ───────────────────────
+        this.updateVisuals();
         this.updateStats();
     }
 
     /**
-     * STUB: Placeholder for Phase 2 visual rendering.
-     * Logs render state to console. Replace with MoleculeRenderer
-     * and PathwayPlotter calls once js/molecules.js exists.
+     * Update all visualizations with current state.
      */
-    updateVisualsStub() {
-        const r = this.results;
-        console.log(
-            `Render: ${r.metabolite} at pH ${r.pH.toFixed(1)} ` +
-            `→ ${r.dominantSpecies} ` +
-            `(${r.protonatedPercent.toFixed(1)}% protonated, ` +
-            `${r.deprotonatedPercent.toFixed(1)}% deprotonated)`
-        );
+    updateVisuals() {
+        if (!this.visualsReady) return;
+
+        const state = this.results;
+        const { pH, metabolite } = this.state;
+
+        // ─── Panel A: Protonated Species (100% acid form) ───────────
+        if (this.rendererProtonated) {
+            const protonatedState = {
+                identity: state.identity,
+                physics: {
+                    ...state.physics,
+                    protonated: 1.0,
+                    deprotonated: 0.0
+                }
+            };
+            this.rendererProtonated.render(protonatedState);
+        }
+
+        // ─── Panel B: Deprotonated Species (current equilibrium) ────
+        if (this.rendererDeprotonated) {
+            this.rendererDeprotonated.render(state);
+        }
+
+        // ─── Panel C: Speciation Diagram ────────────────────────────
+        if (this.plotter) {
+            this.plotter.update(metabolite, pH);
+        }
     }
 
     /**
-     * Update DOM text elements with current chemistry results.
-     * Re-maps legacy perovskite stat IDs to biochemistry values.
+     * Update DOM stat elements.
      */
     updateStats() {
-        const r = this.results;
+        const r = this.results.physics;
 
-        // ─── Panel A stats (re-mapped: "Overlap Factor" → "Protonated %") ─
         const panelAStat = document.getElementById('overlapCubic');
         if (panelAStat) {
             panelAStat.textContent = `${r.protonatedPercent.toFixed(1)}%`;
         }
 
-        // ─── Panel B stats (re-mapped: "Overlap Factor" → "Deprotonated %") ─
         const panelBStat = document.getElementById('overlapDistorted');
         if (panelBStat) {
             panelBStat.textContent = `${r.deprotonatedPercent.toFixed(1)}%`;
         }
 
-        // ─── Panel B angle display (re-mapped: "Angle" → "pH") ─────
         const panelBAngle = document.getElementById('angleDistorted');
         if (panelBAngle) {
             panelBAngle.textContent = `pH ${r.pH.toFixed(1)}`;
         }
 
-        // ─── Panel C stats (re-mapped: "Band Width" → "Dominant Species") ─
         const panelCStat1 = document.getElementById('bandWidth');
         if (panelCStat1) {
             panelCStat1.textContent = r.dominantSpecies;
         }
 
-        // ─── Panel C stats (re-mapped: "Band Gap" → "Net Charge") ──
         const panelCStat2 = document.getElementById('bandGap');
         if (panelCStat2) {
             panelCStat2.textContent = `${r.netCharge.toFixed(2)} e`;
@@ -249,15 +251,11 @@ class SimulationEngine {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Bootstrap: Initialise when DOM is ready
+// Bootstrap
 // ═══════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🧬 Keto Metabolic Simulator: Loading...');
-
-    // Create the simulation engine (global for debug access)
     window.app = new SimulationEngine();
-
     console.log('✅ Simulation Engine Ready');
-    console.log('💡 Tip: Access state via window.app.state');
-    console.log('💡 Tip: Access results via window.app.results');
+    console.log('💡 Access via window.app');
 });
