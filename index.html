@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perovskite Band Structure Simulator</title>
+    <title>Keto Acids Metabolism Simulator</title>
     <link rel="stylesheet" href="index.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,39 +15,43 @@
 <body>
     <div class="container">
         <header>
-            <h1>Perovskite Band Structure Simulator</h1>
-            <p class="subtitle">Interactive Orbital Overlap & Electronic Structure Visualisation</p>
+            <h1>Keto Acids Metabolism Simulator</h1>
+            <p class="subtitle">Interactive pH-Dependent Protonation & Metabolic Pathway Visualisation</p>
         </header>
 
         <!-- Control Panel -->
         <div class="control-panel">
             <div class="control-group">
                 <label for="angleSlider">
-                    B–O–B Angle: <span id="angleValue">180</span>°
+                    System pH: <span id="angleValue">7.4</span>
                 </label>
                 <input type="range" id="angleSlider" min="140" max="180" value="180" step="1" class="slider">
+                <!-- TODO (Phase 2): Update slider to min="0" max="14" step="0.1" value="7.4" id="pHSlider" -->
+                <!-- Current slider range [140–180] is re-mapped to [0.0–14.0] in app.js -->
                 <div class="angle-labels">
-                    <span>140° (Highly Distorted)</span>
-                    <span>180° (Cubic)</span>
+                    <span>pH 0.0 (Strongly Acidic)</span>
+                    <span>pH 14.0 (Strongly Basic)</span>
                 </div>
             </div>
 
             <div class="control-row">
                 <div class="control-group">
-                    <label for="metalSelect">B-site Metal:</label>
+                    <label for="metalSelect">Metabolite:</label>
                     <select id="metalSelect" class="select">
-                        <option value="Ti">Ti (Titanium)</option>
-                        <option value="Mn">Mn (Manganese)</option>
+                        <option value="Pyruvate">Pyruvate (α-keto, pKa 2.50)</option>
+                        <option value="Acetoacetate">Acetoacetate (β-keto, pKa 3.58)</option>
+                        <option value="α-Ketoglutarate">α-Ketoglutarate (pKa 2.47)</option>
+                        <option value="Oxaloacetate">Oxaloacetate (pKa 2.22)</option>
                     </select>
                 </div>
 
                 <div class="control-group">
-                    <label for="aSelect">A-site Cation:</label>
+                    <label for="aSelect">Physiological Context:</label>
                     <select id="aSelect" class="select">
-                        <option value="Ca">Ca (Calcium)</option>
-                        <option value="Sr">Sr (Strontium)</option>
-                        <option value="Ba">Ba (Barium)</option>
-                        <option value="La">La (Lanthanum)</option>
+                        <option value="blood">Blood Plasma (pH 7.4)</option>
+                        <option value="stomach">Stomach Lumen (pH 1.5)</option>
+                        <option value="cytosol">Cytosol (pH 7.2)</option>
+                        <option value="lysosome">Lysosome (pH 4.5)</option>
                     </select>
                 </div>
             </div>
@@ -55,69 +59,69 @@
             <div class="toggle-group">
                 <label class="toggle">
                     <input type="checkbox" id="showOrbitalLobes" checked>
-                    <span>Show Orbital Lobes</span>
+                    <span>Show Molecular Structure</span>
                 </label>
                 <label class="toggle">
                     <input type="checkbox" id="showBonds" checked>
-                    <span>Show Bonds</span>
+                    <span>Show Metabolic Pathway</span>
                 </label>
             </div>
         </div>
 
-        <!-- Three-Panel Visualization -->
+        <!-- Three-Panel Visualisation -->
         <div class="viz-grid">
-            <!-- Panel A: Cubic Orbital Overlap -->
+            <!-- Panel A: Protonated Species -->
             <div class="panel">
                 <h2>
                     <span class="panel-label">(a)</span>
-                    Cubic Pm-3̄m Structure
+                    Protonated Species
                 </h2>
-                <p class="panel-desc">Effective d–p orbital overlap at 180° B–O–B angle</p>
+                <p class="panel-desc">Acid form (R-COOH) — dominant below pKa</p>
                 <canvas id="canvasCubic" width="400" height="400"></canvas>
                 <div class="stats">
                     <div class="stat-item">
-                        <span class="stat-label">Overlap Factor:</span>
-                        <span class="stat-value" id="overlapCubic">1.000</span>
+                        <span class="stat-label">Protonated:</span>
+                        <span class="stat-value" id="overlapCubic">0.0%</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Panel B: Distorted Orbital Overlap -->
+            <!-- Panel B: Deprotonated Species -->
             <div class="panel">
                 <h2>
                     <span class="panel-label">(b)</span>
-                    Distorted Pnma Structure
+                    Deprotonated Species
                 </h2>
-                <p class="panel-desc">Reduced overlap due to octahedral tilting</p>
+                <p class="panel-desc">Conjugate base (R-COO⁻) — dominant above pKa</p>
                 <canvas id="canvasDistorted" width="400" height="400"></canvas>
                 <div class="stats">
                     <div class="stat-item">
-                        <span class="stat-label">Overlap Factor:</span>
-                        <span class="stat-value" id="overlapDistorted">0.866</span>
+                        <span class="stat-label">Deprotonated:</span>
+                        <span class="stat-value" id="overlapDistorted">100.0%</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Angle:</span>
-                        <span class="stat-value" id="angleDistorted">150°</span>
+                        <span class="stat-label">Current pH:</span>
+                        <span class="stat-value" id="angleDistorted">pH 7.4</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Panel C: Band Structure -->
+            <!-- Panel C: Titration / Speciation -->
             <div class="panel panel-wide">
                 <h2>
                     <span class="panel-label">(c)</span>
-                    Simplified Band Structure
+                    Speciation Diagram
                 </h2>
-                <p class="panel-desc">E(k) dispersion showing O 2p valence and B d conduction bands</p>
+                <p class="panel-desc">Henderson-Hasselbalch protonation equilibrium vs pH</p>
                 <div id="plotBandStructure" class="plot-container"></div>
                 <div class="stats stats-row">
                     <div class="stat-item">
-                        <span class="stat-label">Conduction Band Width:</span>
-                        <span class="stat-value" id="bandWidth">11.35 eV</span>
+                        <span class="stat-label">Dominant Species:</span>
+                        <span class="stat-value" id="bandWidth">Pyruvate⁻</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Band Gap:</span>
-                        <span class="stat-value" id="bandGap">4.00 eV</span>
+                        <span class="stat-label">Net Charge:</span>
+                        <span class="stat-value" id="bandGap">-1.00 e</span>
                     </div>
                 </div>
             </div>
@@ -126,17 +130,16 @@
         <!-- Info Footer -->
         <footer>
             <p>
-                <strong>Physics Model:</strong> 2-band tight-binding Hamiltonian with Harrison's d<sup>-3.5</sup>
-                scaling law.
-                Real-time client-side computation validated against Python reference implementation.
+                <strong>Chemistry Model:</strong> Henderson-Hasselbalch equation for acid-base equilibria.
+                Real-time client-side computation of pH-dependent protonation states for keto acid metabolites.
             </p>
         </footer>
     </div>
 
-    <!-- Scripts -->
-    <script src="js/physics.js"></script>
-    <script src="js/orbitals.js"></script>
-    <script src="js/plotter.js"></script>
+    <!-- Scripts: chemistry.js loaded BEFORE app.js -->
+    <!-- <script src="js/chemistry.js"></script>  ← Uncomment when chemistry.js is ready -->
+    <!-- <script src="js/molecules.js"></script>  ← Phase 2: Molecular renderer -->
+    <!-- <script src="js/pathways.js"></script>   ← Phase 2: Pathway plotter -->
     <script src="js/app.js"></script>
 </body>
 
