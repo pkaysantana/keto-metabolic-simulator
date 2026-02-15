@@ -136,10 +136,10 @@
         </footer>
     </div>
 
-    <!-- Scripts: chemistry.js loaded BEFORE app.js -->
-    <!-- <script src="js/chemistry.js"></script>  ← Uncomment when chemistry.js is ready -->
-    <!-- <script src="js/molecules.js"></script>  ← Phase 2: Molecular renderer -->
-    <!-- <script src="js/pathways.js"></script>   ← Phase 2: Pathway plotter -->
+    <!-- Scripts: Load in correct order (chemistry.js BEFORE app.js) -->
+    <script src="js/chemistry.js"></script>
+    <script src="js/molecules.js"></script>
+    <script src="js/pathways.js"></script>
     <script src="js/app.js"></script>
 </body>
 
