@@ -22,12 +22,10 @@
         <!-- Control Panel -->
         <div class="control-panel">
             <div class="control-group">
-                <label for="angleSlider">
+                <label for="pHSlider">
                     System pH: <span id="angleValue">7.4</span>
                 </label>
-                <input type="range" id="angleSlider" min="140" max="180" value="180" step="1" class="slider">
-                <!-- TODO (Phase 2): Update slider to min="0" max="14" step="0.1" value="7.4" id="pHSlider" -->
-                <!-- Current slider range [140–180] is re-mapped to [0.0–14.0] in app.js -->
+                <input type="range" id="pHSlider" min="0" max="14" value="7.4" step="0.1" class="slider">
                 <div class="angle-labels">
                     <span>pH 0.0 (Strongly Acidic)</span>
                     <span>pH 14.0 (Strongly Basic)</span>

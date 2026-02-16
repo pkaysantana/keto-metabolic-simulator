@@ -89,15 +89,14 @@ class SimulationEngine {
      * Bind DOM elements to state via Observer Pattern.
      */
     initializeUI() {
-        // ─── pH Slider (re-mapped from legacy angle slider) ─────────
-        const slider = document.getElementById('angleSlider');
+        // ─── pH Slider (native pH range 0-14) ───────────────────────
+        const slider = document.getElementById('pHSlider');
         const valueDisplay = document.getElementById('angleValue');
 
         if (slider) {
             slider.addEventListener('input', (e) => {
-                // RE-MAP: legacy range [140, 180] → pH range [0.0, 14.0]
-                const raw = parseFloat(e.target.value);
-                this.state.pH = ((raw - 140) / (180 - 140)) * 14.0;
+                // Direct pH value (no remapping needed)
+                this.state.pH = parseFloat(e.target.value);
 
                 if (valueDisplay) {
                     valueDisplay.textContent = this.state.pH.toFixed(1);

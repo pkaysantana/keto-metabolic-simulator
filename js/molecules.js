@@ -463,8 +463,8 @@ class MoleculeRenderer {
     // ═════════════════════════════════════════════════════════════════
 
     /**
-     * Draw the molecule name at the top of the canvas.
-     */
+ * Draw the molecule name and protonation stats overlay.
+ */
     drawTitle(name, protonated) {
         const ctx = this.ctx;
         ctx.save();
@@ -473,6 +473,7 @@ class MoleculeRenderer {
             ? `${name} (Acid Form)`
             : `${name}⁻ (Conjugate Base)`;
 
+        // ─── Title ──────────────────────────────────────────────────
         ctx.font = 'bold 14px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
@@ -480,6 +481,35 @@ class MoleculeRenderer {
         ctx.shadowColor = '#06b6d4';
         ctx.shadowBlur = 4;
         ctx.fillText(species, this.width / 2, 12);
+
+        // ─── Protonation Stats Overlay ──────────────────────────────
+        ctx.shadowBlur = 0;
+        ctx.font = '11px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+
+        const pctProt = (protonated * 100).toFixed(1);
+        const pctDeprot = ((1 - protonated) * 100).toFixed(1);
+
+        // α_HA bar (magenta)
+        ctx.fillStyle = '#d946ef';
+        ctx.fillText(`α(HA) = ${pctProt}%`, 8, this.height - 20);
+
+        // α_A⁻ bar (cyan)
+        ctx.fillStyle = '#06b6d4';
+        ctx.fillText(`α(A⁻) = ${pctDeprot}%`, 8, this.height - 6);
+
+        // Visual mini-bar
+        const barX = 120, barY = this.height - 30, barW = this.width - 136, barH = 6;
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(barX, barY, barW, barH);          // background
+        ctx.fillStyle = '#d946ef';
+        ctx.fillRect(barX, barY, barW * protonated, barH);  // protonated fill
+
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(barX, barY + 14, barW, barH);     // background
+        ctx.fillStyle = '#06b6d4';
+        ctx.fillRect(barX, barY + 14, barW * (1 - protonated), barH); // deprotonated fill
 
         ctx.restore();
     }
@@ -507,3 +537,4 @@ class MoleculeRenderer {
         this.ctx.restore();
     }
 }
+
